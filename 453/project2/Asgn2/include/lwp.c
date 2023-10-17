@@ -64,5 +64,15 @@ loaded via swap_rfiles() it will run the given function. This may be called by a
    c->stack = mmap(NULL, resource_limit, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
    c->stacksize = resource_limit;
    // need to push the address of the function onto the stack
+
+
+   // swap rfiles is the last thig we do, we return from that function into the function we want to 
+    // run
 }
 
+void lwp_start() {
+    /*
+Starts the threading system by converting the calling thread—the original system thread—into a LWP
+by allocating a context for it and admitting it to the scheduler, and yields control to whichever thread the
+scheduler indicates. It is not necessary to allocate a stack for this thread since it already has one.*/
+}
