@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/resource.h>
 #include <sys/mman.h>
+#include <sys/mman.h>
 
 // define global variables
 // Need to keep track of the return address that we replaced with the address of the function arg
@@ -11,13 +12,13 @@
 int tid_counter;
 tid_counter = 1;
 
-tid lwp_create(lwpfun function, void *argument)
-{
+
+tid_t lwp_create(lwpfun function, void *argument) {
     /*
     Creates a new thread and admits it to the current scheduler. The thread’s resources will consist of a
-context and stack, both initialized so that when the scheduler chooses this thread and its context is
-loaded via swap_rfiles() it will run the given function. This may be called by any thread.
-*/
+    context and stack, both initialized so that when the scheduler chooses this thread and its context is
+    loaded via swap_rfiles() it will run the given function. This may be called by any thread.
+    */
     long page_size;
     struct rlimit rlp;
     int result;
@@ -26,7 +27,11 @@ loaded via swap_rfiles() it will run the given function. This may be called by a
     context *c;
     rfile *new_rfile;
     tid_counter++;
-    unsigned long *stack_pointer;
+
+    // // addition... making new thread
+    // tid_t newthread;
+    // //initializing FPU for regfile of thread
+    // newthread->state.fxsave=FPU_INIT;
 
     // need to allocate memory for the context struct
     c = malloc(sizeof(context));
