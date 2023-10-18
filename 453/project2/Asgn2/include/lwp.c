@@ -26,9 +26,9 @@ tid_t lwp_create(lwpfun function, void *argument) {
     void *s;
     context *c;
     rfile *new_rfile;
-    tid_counter++;
+    unsigned long *stack_pointer;
 
-    // // addition... making new thread
+    // // addition... making new thread... Nick- I don't think we need this
     // tid_t newthread;
     // //initializing FPU for regfile of thread
     // newthread->state.fxsave=FPU_INIT;
@@ -40,10 +40,10 @@ tid_t lwp_create(lwpfun function, void *argument) {
         perror("Error allocating memory for context struct");
         exit(EXIT_FAILURE);
     }
-    c->tid = tid_counter;
+    c->tid = tid_counter++;
     c->status = 0; // not running yet
 
-    // need to allocate memory for the rfile structs, one for the new thread and one for the old thread
+    // need to allocate memory for the rfile struct
     new_rfile = malloc(sizeof(rfile));
     if (new_rfile == NULL)
     {
@@ -56,6 +56,7 @@ tid_t lwp_create(lwpfun function, void *argument) {
 
     // Get the value of the resource limit for the stack size (RLIMIT_STACK) using getrlimit(2). Use the soft limit
     result = getrlimit(RLIMIT_STACK, &rlp);
+
     // If RLIMIT_STACK does not exist or if its value is RLIM_INFINITY, use a stack size of 8MB.
     if (result == -1 || rlp.rlim_cur == RLIM_INFINITY)
     {
@@ -70,7 +71,7 @@ tid_t lwp_create(lwpfun function, void *argument) {
             resource_limit = resource_limit + (page_size - (resource_limit % page_size));
         }
     }
-    // need to admit the context to the scheduler at some point too
+    // TODO: admit the context to the scheduler 
 
     // Allocate a stack the size of our resource limit, MAP_STACK ensures stack is on 16-byte boundary
     // stack pointer will be at a low memory address
@@ -80,8 +81,14 @@ tid_t lwp_create(lwpfun function, void *argument) {
         perror("Error allocating memory for stack");
         exit(EXIT_FAILURE);
     }
+    if (stack_pointer % 16 != 0)
+    {
+        perror("Stack not properly aligned");
+        exit(EXIT_FAILURE);
+    }
+
     stack_pointer = stack_pointer + resource_limit; // now our stack pointer is at high memory address
-    c->stack = stack_pointer;
+    c->stack = stack_pointer; // Set base of the stack
     c->stacksize = resource_limit;
 
     // need to push the address of the function wrapper onto the stack
@@ -92,19 +99,12 @@ tid_t lwp_create(lwpfun function, void *argument) {
     // put the the arg pointer goes into the register %rdi
     new_rfile->rdi = function;
     new_rfile->rsi = argument;
-    new_rfile->rbp = stack_pointer;
+    new_rfile->rbp = stack_pointer; // should this go before we add the addres to the stack?
     new_rfile->rsp = stack_pointer;
     new_rfile->fxsave = FPU_INIT;
     // Do I need to set the registers to 0?
 }
 
-void lwp_start()
-{
-    /*
-Starts the threading system by converting the calling thread—the original system thread—into a LWP
-by allocating a context for it and admitting it to the scheduler, and yields control to whichever thread the
-scheduler indicates. It is not necessary to allocate a stack for this thread since it already has one.*/
-}
 
 static void lwp_wrap(lwpfun fun, void *arg)
 {
@@ -113,23 +113,6 @@ static void lwp_wrap(lwpfun fun, void *arg)
     int rval;
     rval = fun(arg);
     lwp_exit(rval);
-}
-
-void lwp_yield() {
-    /*Yields control to the next thread as indicated by the scheduler. If there is no next thread, calls exit(3)
-    with the termination status of the calling thread*/
-
-    // get next thread from scheduler
-    thread next_thread = scheduler.next();
-    // if not null switch context and return address
-    if (next_thread != NULL) {
-
-    }
-
-    // else exit(LWP_TERM)
-    else {
-
-    }
 }
 
 void  lwp_exit(int status) {
@@ -168,3 +151,12 @@ scheduler lwp_get_scheduler(void) {
 thread tid2thread(tid_t tid) {
 
 }
+
+void lwp_start()
+{
+    /*
+Starts the threading system by converting the calling thread—the original system thread—into a LWP
+by allocating a context for it and admitting it to the scheduler, and yields control to whichever thread the
+scheduler indicates. It is not necessary to allocate a stack for this thread since it already has one.*/
+}
+
