@@ -151,7 +151,7 @@ tid_t lwp_wait(int *){
 }
 
 void  lwp_set_scheduler(scheduler fun) {
-
+    
 }
 
 scheduler lwp_get_scheduler(void) {
@@ -162,11 +162,5 @@ thread tid2thread(tid_t tid) {
 
 }
 
-void lwp_start()
-{
-    /*
-Starts the threading system by converting the calling thread—the original system thread—into a LWP
-by allocating a context for it and admitting it to the scheduler, and yields control to whichever thread the
-scheduler indicates. It is not necessary to allocate a stack for this thread since it already has one.*/
-}
+
 
