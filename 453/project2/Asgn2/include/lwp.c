@@ -90,7 +90,7 @@ tid_t lwp_create(lwpfun function, void *argument) {
 
     // need to set all the registers for the new lwp using the function arguments from above
     // put the the arg pointer goes into the register %rdi
-    new_rfile->rdi = lwp_wrap;
+    new_rfile->rdi = function;
     new_rfile->rsi = argument;
     new_rfile->rbp = stack_pointer;
     new_rfile->rsp = stack_pointer;
@@ -113,4 +113,58 @@ static void lwp_wrap(lwpfun fun, void *arg)
     int rval;
     rval = fun(arg);
     lwp_exit(rval);
+}
+
+void lwp_yield() {
+    /*Yields control to the next thread as indicated by the scheduler. If there is no next thread, calls exit(3)
+    with the termination status of the calling thread*/
+
+    // get next thread from scheduler
+    thread next_thread = scheduler.next();
+    // if not null switch context and return address
+    if (next_thread != NULL) {
+
+    }
+
+    // else exit(LWP_TERM)
+    else {
+
+    }
+}
+
+void  lwp_exit(int status) {
+    /*Starts the threading system by converting the calling thread—the original system thread—into a LWP
+    by allocating a context for it and admitting it to the scheduler, and yields control to whichever thread the
+    scheduler indicates. It is not necessary to allocate a stack for this thread since it already has one.*/
+
+}
+
+tid_t lwp_gettid(void) {
+
+}
+
+void  lwp_start(void) {
+    /*Starts the threading system by converting the calling thread—the original system thread—into a LWP
+    by allocating a context for it and admitting it to the scheduler, and yields control to whichever thread the
+    scheduler indicates. It is not necessary to allocate a stack for this thread since it already has one.  */
+
+}
+
+tid_t lwp_wait(int *){
+    /*Deallocates the resources of a terminated LWP. If no LWPs have terminated and there still exist
+    runnable threads, blocks until one terminates. If status is non-NULL, *status is populated with its
+    termination status. Returns the tid of the terminated thread or NO_THREAD if it would block forever
+    because there are no more runnable threads that could terminate.*/
+}
+
+void  lwp_set_scheduler(scheduler fun) {
+
+}
+
+scheduler lwp_get_scheduler(void) {
+
+}
+
+thread tid2thread(tid_t tid) {
+
 }
