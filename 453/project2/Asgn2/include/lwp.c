@@ -71,7 +71,6 @@ tid_t lwp_create(lwpfun function, void *argument) {
             resource_limit = resource_limit + (page_size - (resource_limit % page_size));
         }
     }
-    // TODO: admit the context to the scheduler 
 
     // Allocate a stack the size of our resource limit, MAP_STACK ensures stack is on 16-byte boundary
     // stack pointer will be at a low memory address
@@ -103,6 +102,9 @@ tid_t lwp_create(lwpfun function, void *argument) {
     new_rfile->rsp = stack_pointer;
     new_rfile->fxsave = FPU_INIT;
     // Do I need to set the registers to 0?
+
+    // TODO: admit the context to the scheduler 
+    
 }
 
 
@@ -130,7 +132,15 @@ void  lwp_start(void) {
     /*Starts the threading system by converting the calling thread—the original system thread—into a LWP
     by allocating a context for it and admitting it to the scheduler, and yields control to whichever thread the
     scheduler indicates. It is not necessary to allocate a stack for this thread since it already has one.  */
+    
+    // TODO: allocate a context for the calling thread
 
+    // TODO: admit the context to the scheduler
+
+    //TODO: VERY LAST THING we do in this function is switch the stack to the first lwp, then when we return
+    // we will return to lwp_wrap. To do this switch I will get the next thread from the scheduler.
+    // Then I will use swap_rfiles to switch the stack to this thread. All the info about threads will
+    // be stored in the scheduler, allowing this process to work.
 }
 
 tid_t lwp_wait(int *){
