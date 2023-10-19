@@ -88,9 +88,10 @@ tid_t lwp_create(lwpfun function, void *argument) {
         perror("Stack not properly aligned");
         exit(EXIT_FAILURE);
     }
+    c->stack = stack_pointer; // Set base of the stack, need so that we can unmap later
 
     stack_pointer = stack_pointer + resource_limit; // now our stack pointer is at high memory address
-    c->stack = stack_pointer; // Set base of the stack
+    
     c->stacksize = resource_limit;
 
     // need to push the address of the function wrapper onto the stack
@@ -104,9 +105,9 @@ tid_t lwp_create(lwpfun function, void *argument) {
     c->state.rbp = stack_pointer;// should this go before we add the addres to the stack?
     c->state.rsp = stack_pointer;
     c->state.fxsave = FPU_INIT;
-    // Do I need to set the registers to 0?
 
-    // TODO: admit the context to the scheduler 
+    // admit the context to the scheduler 
+    sched->admit(c);
 
     
 }
@@ -143,7 +144,7 @@ void  lwp_start(void) {
     calling_thread->status = 0; // not running yet
 
 
-    // TODO: admit the context to the scheduler
+    // admit the context to the scheduler
     sched->admit(calling_thread);
 
     //TODO: VERY LAST THING we do in this function is switch the stack to the first lwp, then when we return
@@ -152,7 +153,6 @@ void  lwp_start(void) {
     // be stored in the scheduler, allowing this process to work.
     first_lwp = sched->next();
     swap_rfiles(&calling_thread->state, &first_lwp->state);
-
 }
 
 tid_t lwp_wait(int *){
