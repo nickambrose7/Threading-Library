@@ -11,6 +11,7 @@
 // Need to keep track of the return address that we replaced with the address of the function arg
 // need to keep track of the scheduler
 int tid_counter = 2;
+scheduler sched = lwp_get_scheduler();
 
 
 
@@ -36,13 +37,6 @@ tid_t lwp_create(lwpfun function, void *argument) {
     void *s;
     thread c;
     unsigned long *stack_pointer;
-    scheduler sched;
-    sched = lwp_get_scheduler();
-
-    // // addition... making new thread... Nick- I don't think we need this
-    // tid_t newthread;
-    // //initializing FPU for regfile of thread
-    // newthread->state.fxsave=FPU_INIT;
 
     // need to allocate memory for the context struct
     c = malloc(sizeof(context));
@@ -90,13 +84,23 @@ tid_t lwp_create(lwpfun function, void *argument) {
     }
     c->stack = stack_pointer; // Set base of the stack, need so that we can unmap later
 
-    stack_pointer = stack_pointer + resource_limit; // now our stack pointer is at high memory address
-    
-    c->stacksize = resource_limit;
+    // now our stack pointer is at high memory address, divide by size of unsigned long
+    stack_pointer = stack_pointer + (resource_limit / sizeof(unsigned long)); 
+   
+   //check that stack pointer is divisble by 16, move to lower addresses.
+    if ((uintptr_t)stack_pointer % 16 != 0)
+    {
+        perror("Stack not properly aligned - after moving to lower addresses");
+        exit(EXIT_FAILURE);
+    }
+
+    c->stacksize = resource_limit; // keep track of stack size in bytes
 
     // need to push the address of the function wrapper onto the stack
+    stack_pointer--;           // this will subtract the size of an unsiged long from the stack pointer
     *stack_pointer = lwp_wrap; // this will push the address of the function wrapper onto the stack
     stack_pointer--;           // this will subtract the size of an unsiged long from the stack pointer
+    // need to move the address two times so that we say alligned on 16 byte boundary
 
     // need to set all the registers for the new lwp using the function arguments from above
     // put the the arg pointer goes into the register %rdi
@@ -108,15 +112,25 @@ tid_t lwp_create(lwpfun function, void *argument) {
 
     // admit the context to the scheduler 
     sched->admit(c);
+}
 
+void lwp_yield(void) {
+//     Yields control to the next thread as indicated by the scheduler. If there is no next thread, calls exit(3)
+// with the termination status of the calling thread (see below). 
     
+    //TODO: get the next thread from the scheduler
+
+    //TODO: admit the old thread to the scheduler
+
+    //TODO: swap the context of the current thread with the next thread
+
 }
 
 
 void  lwp_exit(int status) {
-    /*Starts the threading system by converting the calling thread—the original system thread—into a LWP
-    by allocating a context for it and admitting it to the scheduler, and yields control to whichever thread the
-    scheduler indicates. It is not necessary to allocate a stack for this thread since it already has one.*/
+// Terminates the calling thread. Its termination status becomes the low 8 bits of the passed integer. The
+// thread’s resources will be deallocated once it is waited for in lwp_wait(). Yields control to the next
+// thread using lwp_yield().
 
 }
 
@@ -131,9 +145,7 @@ void  lwp_start(void) {
     
     // TODO: allocate a context for the calling thread
     thread calling_thread;
-    scheduler sched;
     thread first_lwp;
-    sched = lwp_get_scheduler();
     calling_thread = malloc(sizeof(context));
     if (calling_thread == NULL)
     {
@@ -155,14 +167,16 @@ void  lwp_start(void) {
     swap_rfiles(&calling_thread->state, &first_lwp->state);
 }
 
-tid_t lwp_wait(int *){
+tid_t lwp_wait(int *status){
     /*Deallocates the resources of a terminated LWP. If no LWPs have terminated and there still exist
     runnable threads, blocks until one terminates. If status is non-NULL, *status is populated with its
     termination status. Returns the tid of the terminated thread or NO_THREAD if it would block forever
     because there are no more runnable threads that could terminate.*/
+
 }
 
 void  lwp_set_scheduler(scheduler fun) {
+    sched = fun;
     
 }
 
