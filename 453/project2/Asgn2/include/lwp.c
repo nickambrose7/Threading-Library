@@ -3,14 +3,15 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/resource.h>
+#define _GNU_SOURCE
 #include <sys/mman.h>
-#include <sys/mman.h>
+
 
 // define global variables
 // Need to keep track of the return address that we replaced with the address of the function arg
 // need to keep track of the scheduler
-int tid_counter;
-tid_counter = 2;
+int tid_counter = 2;
+
 
 
 static void lwp_wrap(lwpfun fun, void *arg)
@@ -80,7 +81,7 @@ tid_t lwp_create(lwpfun function, void *argument) {
         perror("Error allocating memory for stack");
         exit(EXIT_FAILURE);
     }
-    if (stack_pointer % 16 != 0)
+    if ((uintptr_t)stack_pointer % 16 != 0)
     {
         perror("Stack not properly aligned");
         exit(EXIT_FAILURE);
@@ -126,7 +127,7 @@ void  lwp_start(void) {
     
     // TODO: allocate a context for the calling thread
     thread calling_thread;
-    scheduler* sched;
+    scheduler sched;
     thread first_lwp;
     sched = lwp_get_scheduler();
     calling_thread = malloc(sizeof(context));
