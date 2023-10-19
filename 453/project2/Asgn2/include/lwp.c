@@ -36,6 +36,8 @@ tid_t lwp_create(lwpfun function, void *argument) {
     void *s;
     thread c;
     unsigned long *stack_pointer;
+    scheduler sched;
+    sched = lwp_get_scheduler();
 
     // // addition... making new thread... Nick- I don't think we need this
     // tid_t newthread;
@@ -105,6 +107,7 @@ tid_t lwp_create(lwpfun function, void *argument) {
     // Do I need to set the registers to 0?
 
     // TODO: admit the context to the scheduler 
+
     
 }
 
