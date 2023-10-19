@@ -11,7 +11,7 @@
 // Need to keep track of the return address that we replaced with the address of the function arg
 // need to keep track of the scheduler
 int tid_counter = 2;
-scheduler sched = lwp_get_scheduler();
+scheduler sched;
 
 
 
@@ -114,16 +114,23 @@ tid_t lwp_create(lwpfun function, void *argument) {
     sched->admit(c);
 }
 
-void lwp_yield(void) {
+void lwp_yield(void) { // CHECK CORRECTNESS WITH TEACHER
 //     Yields control to the next thread as indicated by the scheduler. If there is no next thread, calls exit(3)
 // with the termination status of the calling thread (see below). 
     
     //TODO: get the next thread from the scheduler
+    tid_t current_tid;
+    thread next_thread, current_thread;
+    current_tid = lwp_gettid();
+    current_thread = tid2thread(current_tid);
+    next_thread = sched->next();
+
 
     //TODO: admit the old thread to the scheduler
+    sched->admit(current_thread);
 
     //TODO: swap the context of the current thread with the next thread
-
+    swap_rfiles(&current_thread->state, &next_thread->state);
 }
 
 
