@@ -1,10 +1,11 @@
-#include <lwp.h>
+#include "lwp.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/resource.h>
+#define _GNU_SOURCE
 #include <sys/mman.h>
-#include <sys/mman.h>
+
 
 // define global variables
 
@@ -20,9 +21,19 @@ thread head = NULL;
 
 // Need to keep track of the return address that we replaced with the address of the function arg
 // need to keep track of the scheduler
-int tid_counter;
-tid_counter = 1;
+int tid_counter = 2;
+scheduler sched;
 
+
+
+static void lwp_wrap(lwpfun fun, void *arg)
+{
+    /* call the given lwpfucntion with the given argument.
+    calls lwp_exit() with its return value*/
+    int rval;
+    rval = fun(arg);
+    lwp_exit(rval);
+}
 
 tid_t lwp_create(lwpfun function, void *argument) {
     /*
@@ -35,8 +46,7 @@ tid_t lwp_create(lwpfun function, void *argument) {
     int result;
     rlim_t resource_limit;
     void *s;
-    context *c;
-    rfile *new_rfile;
+    thread c;
     unsigned long *stack_pointer;
 
     // need to allocate memory for the context struct
@@ -48,14 +58,6 @@ tid_t lwp_create(lwpfun function, void *argument) {
     }
     c->tid = tid_counter++;
     c->status = 0; // not running yet
-
-    // need to allocate memory for the rfile struct
-    new_rfile = malloc(sizeof(rfile));
-    if (new_rfile == NULL)
-    {
-        perror("Error allocating memory for rfile struct");
-        exit(EXIT_FAILURE);
-    }
 
     // Determine how big the stack should be using sysconf(3)
     page_size = sysconf(_SC_PAGE_SIZE);
@@ -86,47 +88,67 @@ tid_t lwp_create(lwpfun function, void *argument) {
         perror("Error allocating memory for stack");
         exit(EXIT_FAILURE);
     }
-    if (*stack_pointer % 16 != 0)
+    if ((uintptr_t)stack_pointer % 16 != 0)
     {
         perror("Stack not properly aligned");
         exit(EXIT_FAILURE);
     }
+    c->stack = stack_pointer; // Set base of the stack, need so that we can unmap later
 
-    stack_pointer = stack_pointer + resource_limit; // now our stack pointer is at high memory address
-    c->stack = stack_pointer; // Set base of the stack
-    c->stacksize = resource_limit;
+    // now our stack pointer is at high memory address, divide by size of unsigned long
+    stack_pointer = stack_pointer + (resource_limit / sizeof(unsigned long)); 
+   
+   //check that stack pointer is divisble by 16, move to lower addresses.
+    if ((uintptr_t)stack_pointer % 16 != 0)
+    {
+        perror("Stack not properly aligned - after moving to lower addresses");
+        exit(EXIT_FAILURE);
+    }
+
+    c->stacksize = resource_limit; // keep track of stack size in bytes
 
     // need to push the address of the function wrapper onto the stack
+    stack_pointer--;           // this will subtract the size of an unsiged long from the stack pointer
     *stack_pointer = lwp_wrap; // this will push the address of the function wrapper onto the stack
     stack_pointer--;           // this will subtract the size of an unsiged long from the stack pointer
+    // need to move the address two times so that we say alligned on 16 byte boundary
 
     // need to set all the registers for the new lwp using the function arguments from above
     // put the the arg pointer goes into the register %rdi
-    new_rfile->rdi = function;
-    new_rfile->rsi = argument;
-    new_rfile->rbp = stack_pointer; // should this go before we add the addres to the stack?
-    new_rfile->rsp = stack_pointer;
-    new_rfile->fxsave = FPU_INIT;
-    // Do I need to set the registers to 0?
+    c->state.rdi = function;
+    c->state.rsi = argument;
+    c->state.rbp = stack_pointer;// should this go before we add the addres to the stack?
+    c->state.rsp = stack_pointer;
+    c->state.fxsave = FPU_INIT;
 
-    // TODO: admit the context to the scheduler 
+    // admit the context to the scheduler 
+    sched->admit(c);
+}
+
+void lwp_yield(void) { // CHECK CORRECTNESS WITH TEACHER
+//     Yields control to the next thread as indicated by the scheduler. If there is no next thread, calls exit(3)
+// with the termination status of the calling thread (see below). 
     
-}
+    //TODO: get the next thread from the scheduler
+    tid_t current_tid;
+    thread next_thread, current_thread;
+    current_tid = lwp_gettid();
+    current_thread = tid2thread(current_tid);
+    next_thread = sched->next();
 
 
-static void lwp_wrap(lwpfun fun, void *arg)
-{
-    /* call the given lwpfucntion with the given argument.
-    calls lwp_exit() with its return value*/
-    int rval;
-    rval = fun(arg);
-    lwp_exit(rval);
+    //TODO: admit the old thread to the scheduler
+    sched->admit(current_thread);
+
+    //TODO: swap the context of the current thread with the next thread
+    swap_rfiles(&current_thread->state, &next_thread->state);
 }
+
 
 void  lwp_exit(int status) {
-    /*Starts the threading system by converting the calling thread—the original system thread—into a LWP
-    by allocating a context for it and admitting it to the scheduler, and yields control to whichever thread the
-    scheduler indicates. It is not necessary to allocate a stack for this thread since it already has one.*/
+// Terminates the calling thread. Its termination status becomes the low 8 bits of the passed integer. The
+// thread’s resources will be deallocated once it is waited for in lwp_wait(). Yields control to the next
+// thread using lwp_yield().
 
 }
 
@@ -140,26 +162,43 @@ void  lwp_start(void) {
     scheduler indicates. It is not necessary to allocate a stack for this thread since it already has one.  */
     
     // TODO: allocate a context for the calling thread
+    thread calling_thread;
+    thread first_lwp;
+    calling_thread = malloc(sizeof(context));
+    if (calling_thread == NULL)
+    {
+        perror("Error allocating memory for context struct- calling thread");
+        exit(EXIT_FAILURE);
+    }
+    calling_thread->tid = 1;
+    calling_thread->status = 0; // not running yet
 
-    // TODO: admit the context to the scheduler
+
+    // admit the context to the scheduler
+    sched->admit(calling_thread);
 
     //TODO: VERY LAST THING we do in this function is switch the stack to the first lwp, then when we return
     // we will return to lwp_wrap. To do this switch I will get the next thread from the scheduler.
     // Then I will use swap_rfiles to switch the stack to this thread. All the info about threads will
     // be stored in the scheduler, allowing this process to work.
+    first_lwp = sched->next();
+    swap_rfiles(&calling_thread->state, &first_lwp->state);
 }
 
-tid_t lwp_wait(int *){
+tid_t lwp_wait(int *status){
     /*Deallocates the resources of a terminated LWP. If no LWPs have terminated and there still exist
     runnable threads, blocks until one terminates. If status is non-NULL, *status is populated with its
     termination status. Returns the tid of the terminated thread or NO_THREAD if it would block forever
     because there are no more runnable threads that could terminate.*/
+
 }
 
-void  lwp_set_scheduler(scheduler fun) {
+void lwp_set_scheduler(scheduler fun) {
     // if fun is null initialize round robin
-    if (fun != NULL)
-        schedule = fun.init();
+    if (fun != NULL){
+        schedule = fun;
+        fun->init();
+    }
     else {
         schedule = RoundRobin;
     }
@@ -167,7 +206,6 @@ void  lwp_set_scheduler(scheduler fun) {
 }
 
 scheduler lwp_get_scheduler(void) {
-    return 
 
 }
 
