@@ -24,8 +24,6 @@ thread head = NULL;
 int tid_counter = 2;
 scheduler sched;
 
-
-
 static void lwp_wrap(lwpfun fun, void *arg)
 {
     /* call the given lwpfucntion with the given argument.
@@ -153,7 +151,25 @@ void  lwp_exit(int status) {
 }
 
 tid_t lwp_gettid(void) {
+    // check if we have empty thread pool
+    int thread_id = 0;
+    if (head != NULL) {
+        // loop on qlen for tid
+        thread curr_thread = head;
+        while(curr_thread->sched_one != NULL && thread_id == 0) {
+            if (curr_thread->tid == 1){
+                thread_id = 1;
+            }
+            else {
+                curr_thread = curr_thread->sched_one;
+            }
+        }
 
+        if (thread_id == 0) {
+            return NO_THREAD;
+        }
+    }
+    return thread_id;
 }
 
 void  lwp_start(void) {
@@ -202,15 +218,32 @@ void lwp_set_scheduler(scheduler fun) {
     else {
         schedule = RoundRobin;
     }
-
 }
 
 scheduler lwp_get_scheduler(void) {
-
+    return schedule;
 }
 
 thread tid2thread(tid_t tid) {
+    // check if we have empty thread pool
+    if (head != NULL) {
+        // loop on qlen for tid
+        thread curr_thread = head;
+        int found_flag = 0;
+        while(curr_thread->sched_one != NULL && !found_flag) {
+            if (curr_thread->tid == tid){
+                found_flag = 1;
+            }
+            else {
+                curr_thread = curr_thread->sched_one;
+            }
+        }
 
+        if (found_flag) {
+            return curr_thread;
+        }
+    }
+    return NULL;
 }
 
 // void init(void) {
@@ -251,11 +284,11 @@ void remove(thread victim) {
         int found_flag = 0;
         while(curr_thread->sched_one != NULL && !found_flag) {
             if (curr_thread->tid != victim->tid){
-                found_flag = 1;
-            }
-            else {
                 prev_thread = curr_thread;
                 curr_thread = curr_thread->sched_one;
+            }
+            else {
+                found_flag = 1;
             }
         }
 
