@@ -7,6 +7,17 @@
 #include <sys/mman.h>
 
 // define global variables
+
+// making round robin scheduler
+// do not need init and shutdown because our structure is just a thread struct
+struct scheduler rr_publish = {NULL, NULL, admit, remove, next, qlen};
+scheduler RoundRobin = &rr_publish;
+
+// global scheduler
+scheduler schedule;
+// global threadpool --> make thread pointer, maybe static
+thread head = NULL;
+
 // Need to keep track of the return address that we replaced with the address of the function arg
 // need to keep track of the scheduler
 int tid_counter;
@@ -27,11 +38,6 @@ tid_t lwp_create(lwpfun function, void *argument) {
     context *c;
     rfile *new_rfile;
     unsigned long *stack_pointer;
-
-    // // addition... making new thread... Nick- I don't think we need this
-    // tid_t newthread;
-    // //initializing FPU for regfile of thread
-    // newthread->state.fxsave=FPU_INIT;
 
     // need to allocate memory for the context struct
     c = malloc(sizeof(context));
@@ -80,7 +86,7 @@ tid_t lwp_create(lwpfun function, void *argument) {
         perror("Error allocating memory for stack");
         exit(EXIT_FAILURE);
     }
-    if (stack_pointer % 16 != 0)
+    if (*stack_pointer % 16 != 0)
     {
         perror("Stack not properly aligned");
         exit(EXIT_FAILURE);
@@ -151,10 +157,17 @@ tid_t lwp_wait(int *){
 }
 
 void  lwp_set_scheduler(scheduler fun) {
+    // if fun is null initialize round robin
+    if (fun != NULL)
+        schedule = fun.init();
+    else {
+        schedule = RoundRobin;
+    }
 
 }
 
 scheduler lwp_get_scheduler(void) {
+    return 
 
 }
 
@@ -162,11 +175,96 @@ thread tid2thread(tid_t tid) {
 
 }
 
-void lwp_start()
-{
-    /*
-Starts the threading system by converting the calling thread—the original system thread—into a LWP
-by allocating a context for it and admitting it to the scheduler, and yields control to whichever thread the
-scheduler indicates. It is not necessary to allocate a stack for this thread since it already has one.*/
+// void init(void) {
+//     /* initialize any structures     */
+// }
+
+// void shutdown(void){        
+//     /* tear down any structures      */
+//     free(threadPool);
+// }
+
+void admit(thread new){
+    /* add a thread to the pool      */
+
+    // check if we have empty thread pool
+    if (head == NULL) {
+        head = new;
+    }
+    else {
+        // loop on qlen
+        thread curr_thread = head;
+        while (curr_thread->sched_one != NULL) {
+            curr_thread = curr_thread->sched_one;
+        }
+        // set next to new thread
+        curr_thread->sched_one = new;
+    }
+
+}
+void remove(thread victim) {
+    /* remove a thread from the pool */
+
+    // check if we have empty thread pool
+    if (head != NULL) {
+        // loop on qlen for tid
+        thread prev_thread = head;
+        thread curr_thread = head;
+        int found_flag = 0;
+        while(curr_thread->sched_one != NULL && !found_flag) {
+            if (curr_thread->tid != victim->tid){
+                found_flag = 1;
+            }
+            else {
+                prev_thread = curr_thread;
+                curr_thread = curr_thread->sched_one;
+            }
+        }
+
+        if (found_flag) {
+            // get the next thread to link prev to next, either sets to the next thread or NULL
+            thread next_thread = curr_thread->sched_one;
+            // // check the next thread
+            // if (curr_thread->sched_one != NULL) {
+            //     // set next to new thread
+            prev_thread->sched_one = next_thread;
+            // }
+            // else {
+            //     prev_thread->sched_one = NULL;
+            // }
+        }
+        else {
+            perror("Error finding thread to remove");
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
+thread next(void) {            
+    /* select a thread to schedule   */
+    // QUESTION: Maybe the waiting for yielded process and then kick out next here or in wait?
+    // waiting for the current thread to yield; may have to approach differently
+    while(head->status != LWP_TERM);
+    // put current thread at the end of the queue, should put NULL if no other processes in pool?
+    thread finished = head;
+    head = head->sched_one;
+    finished->sched_one = NULL;
+    admit(finished);
+    // return the next thread
+    return head;
+}
+
+int qlen(void) {
+    /* number of ready threads       */
+    // is the readiness of a thread stored in status? loops 
+    // through queue and check ready status or return qlen?
+    int ready = 0;
+    thread curr_thread = head;
+    while(curr_thread != NULL && curr_thread->status == LWP_LIVE) {
+        ready++;
+        curr_thread = curr_thread->sched_one;
+    }
+    return ready;
+
 }
 
