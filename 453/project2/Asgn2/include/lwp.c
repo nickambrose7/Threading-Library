@@ -1,6 +1,7 @@
 #include "lwp.h"
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdio.h>
 #include <sys/resource.h>
 #define _GNU_SOURCE
 #include <sys/mman.h>
@@ -15,10 +16,6 @@ thread head = NULL; // head of the thread pool, using the sched_one pointer
 thread terminated = NULL; // list of terminated threads, using the exited pointer
 
 thread waiting = NULL; // list of waiting threads, using the lib_one pointer
-// Ethan's Question: isn't sched_one waiting?
-//  Nick's Answer: No sched one is the thread pool. I'm using lib_one to keep track of all the threads that
-//  called lwp_wait. This is needed for me to properly implement the function (look at the spec portion about lwp_wait
-//  if you don't understand.)
 
 // Need to keep track of the return address that we replaced with the address of the function arg
 // need to keep track of the scheduler
@@ -61,7 +58,7 @@ void admit(thread new)
         curr_thread->sched_one = new;
     }
 }
-void remove(thread victim)
+void sched_remove(thread victim)
 {
     /* remove a thread from the pool */
 
@@ -110,7 +107,7 @@ thread next(void)
     // put current thread at the end of the queue, should put NULL if no other processes in pool
     thread finished = head;
     head = head->sched_one;
-    remove(finished);
+    sched_remove(finished);
     // RoundRobin->admit(finished); looks like this is already done in yield
     // return the next thread
     return head;
@@ -128,8 +125,11 @@ int qlen(void)
     }
     return ready;
 }
-struct scheduler rr_publish = {NULL, NULL, admit, remove, next, qlen};
+struct scheduler rr_publish = {NULL, NULL, admit, sched_remove, next, qlen};
 scheduler RoundRobin = &rr_publish;
+
+// END SCHEDULER STUFF
+// START LWP STUFF
 
 static void lwp_wrap(lwpfun fun, void *arg)
 {
