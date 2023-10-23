@@ -20,12 +20,12 @@ thread head = NULL; // head of the thread pool, using the sched_one pointer
 
 thread terminated = NULL; // list of terminated threads, using the exited pointer
 
-thread waiting = NULL; // list of waiting threads, using the sched_two pointer
+thread waiting = NULL; // list of waiting threads, using the sched_two pointer, isn't sched_one waiting?
 
 // Need to keep track of the return address that we replaced with the address of the function arg
 // need to keep track of the scheduler
 int tid_counter = 2;
-scheduler sched;
+//scheduler sched;
 
 static void lwp_wrap(lwpfun fun, void *arg)
 {
@@ -124,7 +124,7 @@ tid_t lwp_create(lwpfun function, void *argument)
     c->state.fxsave = FPU_INIT;
 
     // admit the context to the scheduler
-    sched->admit(c);
+    schedule->admit(c);
 
     return c->tid;
 }
@@ -139,10 +139,10 @@ void lwp_yield(void)
     thread next_thread, current_thread;
     current_tid = lwp_gettid();
     current_thread = tid2thread(current_tid);
-    next_thread = sched->next();
+    next_thread = schedule->next();
 
     // TODO: admit the old thread to the scheduler
-    sched->admit(current_thread);
+    schedule->admit(current_thread);
 
     // TODO: swap the context of the current thread with the next thread
     swap_rfiles(&current_thread->state, &next_thread->state);
@@ -163,7 +163,7 @@ void lwp_exit(int status)
     thread removed_thread;
     removed_thread = tid2thread(lwp_gettid());
     removed_thread->status = status;
-    sched->remove(removed_thread);
+    schedule->remove(removed_thread);
 
     // put this thread at the end of the terminated list (exited)
     if (terminated == NULL)
@@ -186,7 +186,7 @@ void lwp_exit(int status)
 }
 
 tid_t lwp_gettid(void)
-{ // CHECK CORRECTNESS WITH TEACHER
+{
     // check if we have empty thread pool
     return head->tid;
 }
@@ -210,13 +210,13 @@ void lwp_start(void)
     calling_thread->status = 0; // not running yet
 
     // admit the context to the scheduler
-    sched->admit(calling_thread);
+    schedule->admit(calling_thread);
 
     // TODO: VERY LAST THING we do in this function is switch the stack to the first lwp, then when we return
     //  we will return to lwp_wrap. To do this switch I will get the next thread from the scheduler.
     //  Then I will use swap_rfiles to switch the stack to this thread. All the info about threads will
     //  be stored in the scheduler, allowing this process to work.
-    first_lwp = sched->next();
+    first_lwp = schedule->next();
     swap_rfiles(&calling_thread->state, &first_lwp->state);
 }
 
@@ -229,7 +229,7 @@ tid_t lwp_wait(int *status)
 
     if (terminated == NULL) // no terminated threads, so we have to block
     {
-        sched->remove(tid2thread(lwp_gettid())); // deschedule the current thread, to block
+        schedule->remove(tid2thread(lwp_gettid())); // deschedule the current thread, to block
         // add the current thread to the waiting list
         if (waiting == NULL)
         {
@@ -237,14 +237,15 @@ tid_t lwp_wait(int *status)
         }
         else
         {
+            // WHY NOT DO ADMIT HERE?
             // loop on qlen
             thread curr_thread = waiting;
-            while (curr_thread->sched_two != NULL)
+            while (curr_thread->sched_one != NULL) // what are you using sched_two for? i changed to sched one because technically those are waiting threads
             {
-                curr_thread = curr_thread->sched_two;
+                curr_thread = curr_thread->sched_one;
             }
             // set next to new thread
-            curr_thread->sched_two = tid2thread(lwp_gettid());
+            curr_thread->sched_one = tid2thread(lwp_gettid());
         }
     }
     else // return the thread at the front of the list, this is the oldest one
@@ -262,6 +263,7 @@ tid_t lwp_wait(int *status)
     }
     //yield to next process
     //munmap if going through if block
+    // also return NO_THREAD if scheduler is empty since it will block forever
 }
 
 void lwp_set_scheduler(scheduler fun)
@@ -284,7 +286,7 @@ scheduler lwp_get_scheduler(void)
 }
 
 thread tid2thread(tid_t tid)
-{
+{ // MAY HAVE TO CHECK TERMINATED THREAD LIST AS WELL, NOT SURE
     // check if we have empty thread pool
     if (head != NULL)
     {
@@ -349,7 +351,7 @@ void remove(thread victim)
     if (head != NULL)
     {
         // loop on qlen for tid
-        thread prev_thread = head;
+        thread prev_thread = NULL;
         thread curr_thread = head;
         int found_flag = 0;
         while (curr_thread->sched_one != NULL && !found_flag)
@@ -377,18 +379,21 @@ void remove(thread victim)
             exit(EXIT_FAILURE);
         }
     }
+    else
+        {
+            perror("Empty queue, nothing to remove");
+            exit(EXIT_FAILURE);
+        }
 }
 
 thread next(void)
 {
     /* select a thread to schedule   */
-    // QUESTION: Maybe the waiting for yielded process and then kick out next here or in wait?
-    // waiting for the current thread to yield; may have to approach differently
-    // put current thread at the end of the queue, should put NULL if no other processes in pool?
+    // put current thread at the end of the queue, should put NULL if no other processes in pool
     thread finished = head;
     head = head->sched_one;
-    finished->sched_one = NULL;
-    RoundRobin->admit(finished);
+    RoundRobin->remove(finished);
+    // RoundRobin->admit(finished); looks like this is already done in yield
     // return the next thread
     return head;
 }
@@ -396,8 +401,6 @@ thread next(void)
 int qlen(void)
 {
     /* number of ready threads       */
-    // is the readiness of a thread stored in status? loops
-    // through queue and check ready status or return qlen?
     int ready = 0;
     thread curr_thread = head;
     while (curr_thread != NULL && curr_thread->status == LWP_LIVE)
