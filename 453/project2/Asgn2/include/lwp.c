@@ -20,7 +20,11 @@ thread head = NULL; // head of the thread pool, using the sched_one pointer
 
 thread terminated = NULL; // list of terminated threads, using the exited pointer
 
-thread waiting = NULL; // list of waiting threads, using the sched_two pointer, isn't sched_one waiting?
+thread waiting = NULL; // list of waiting threads, using the lib_one pointer
+//Ethan's Question: isn't sched_one waiting?
+// Nick's Answer: No sched one is the thread pool. I'm using lib_one to keep track of all the threads that
+// called lwp_wait. This is needed for me to properly implement the function (look at the spec portion about lwp_wait
+// if you don't understand.)
 
 // Need to keep track of the return address that we replaced with the address of the function arg
 // need to keep track of the scheduler
@@ -141,10 +145,10 @@ void lwp_yield(void)
     current_thread = tid2thread(current_tid);
     next_thread = schedule->next();
 
-    // TODO: admit the old thread to the scheduler
+    // admit the old thread to the scheduler
     schedule->admit(current_thread);
 
-    // TODO: swap the context of the current thread with the next thread
+    // swap the context of the current thread with the next thread
     swap_rfiles(&current_thread->state, &next_thread->state);
 }
 
