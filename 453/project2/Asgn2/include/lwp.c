@@ -241,7 +241,8 @@ tid_t lwp_wait(int *status)
         }
         else
         {
-            // WHY NOT DO ADMIT HERE?
+            // WHY NOT DO ADMIT HERE? 
+            // ANSWER: I admit in the line after the while loop
             // loop on qlen
             thread curr_thread = waiting;
             while (curr_thread->sched_one != NULL) // what are you using sched_two for? i changed to sched one because technically those are waiting threads
