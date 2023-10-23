@@ -181,36 +181,14 @@ void lwp_exit(int status)
         // set next to new thread
         curr_thread->exited = removed_thread;
     }
-
+    // check waiting list, readmit waiting threads so they can continue to clean up calling thread
     lwp_yield();
 }
 
 tid_t lwp_gettid(void)
 { // CHECK CORRECTNESS WITH TEACHER
     // check if we have empty thread pool
-    int thread_id = 0;
-    if (head != NULL)
-    {
-        // loop on qlen for tid
-        thread curr_thread = head;
-        while (curr_thread->sched_one != NULL && thread_id == 0)
-        {
-            if (curr_thread->tid == 1)
-            {
-                thread_id = 1;
-            }
-            else
-            {
-                curr_thread = curr_thread->sched_one;
-            }
-        }
-
-        if (thread_id == 0)
-        {
-            return NO_THREAD;
-        }
-    }
-    return thread_id;
+    return head->tid;
 }
 
 void lwp_start(void)
@@ -282,6 +260,8 @@ tid_t lwp_wait(int *status)
         // return the tid of the terminated thread
         return terminated_thread->tid;
     }
+    //yield to next process
+    //munmap if going through if block
 }
 
 void lwp_set_scheduler(scheduler fun)
@@ -389,14 +369,7 @@ void remove(thread victim)
         {
             // get the next thread to link prev to next, either sets to the next thread or NULL
             thread next_thread = curr_thread->sched_one;
-            // // check the next thread
-            // if (curr_thread->sched_one != NULL) {
-            //     // set next to new thread
             prev_thread->sched_one = next_thread;
-            // }
-            // else {
-            //     prev_thread->sched_one = NULL;
-            // }
         }
         else
         {
@@ -411,13 +384,11 @@ thread next(void)
     /* select a thread to schedule   */
     // QUESTION: Maybe the waiting for yielded process and then kick out next here or in wait?
     // waiting for the current thread to yield; may have to approach differently
-    while (head->status != LWP_TERM)
-        ;
     // put current thread at the end of the queue, should put NULL if no other processes in pool?
     thread finished = head;
     head = head->sched_one;
     finished->sched_one = NULL;
-    admit(finished);
+    RoundRobin->admit(finished);
     // return the next thread
     return head;
 }
