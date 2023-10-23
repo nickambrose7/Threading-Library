@@ -216,19 +216,27 @@ tid_t lwp_create(lwpfun function, void *argument)
         exit(EXIT_FAILURE);
     }
 
-    printf("Stack pointer is %p\n", resource_limit);
+    printf("Stack size is %p\n", resource_limit);
     
-    // possible off by one fix:
-    if (resource_limit % page_size != 0) {
-        resource_limit = ((resource_limit / page_size) + 1) * page_size;
-    }
+    // // possible off by one fix:
+    // if (resource_limit % page_size != 0) {
+    //     resource_limit = ((resource_limit / page_size) + 1) * page_size;
+    // }
     c->stacksize = resource_limit; // keep track of stack size in bytes
+    // print that we are at line 227 using fprintf
+    //fprintf(stdout, "Line 227\n"); // TODO: remove this line, only for testing of
 
     // need to push the address of the function wrapper onto the stack
+    
+    // print out stack pointer
+    fprintf(stdout, "Stack pointer is %p\n", stack_pointer);
+    *stack_pointer = (unsigned long) 0;
+    fprintf(stdout, "Where is the error\n");
     stack_pointer--;           // this will subtract the size of an unsiged long from the stack pointer
     *stack_pointer = (unsigned long) lwp_wrap; // this will push the address of the function wrapper onto the stack
     stack_pointer--;           // this will subtract the size of an unsiged long from the stack pointer
     // need to move the address two times so that we say alligned on 16 byte boundary
+    
 
     // need to set all the registers for the new lwp using the function arguments from above
     c->state.rdi = (unsigned long) function;
