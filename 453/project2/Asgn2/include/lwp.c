@@ -250,7 +250,7 @@ tid_t lwp_create(lwpfun function, void *argument)
     *stack_pointer = (unsigned long)0;
     stack_pointer--;                          // this will subtract the size of an unsiged long from the stack pointer
     *stack_pointer = (unsigned long)lwp_wrap; // this will push the address of the function wrapper onto the stack
-
+    stack_pointer--;
     // need to move the address two times so that we say alligned on 16 byte boundary
 
     // need to set all the registers for the new lwp using the function arguments from above
