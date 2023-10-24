@@ -129,7 +129,7 @@ thread next(void)
         thread next = head;
         sched_remove(next);
         admit(next); // put the thread at the end of the queue   
-        return next;
+        return next; // could be NULL
     }
     return NULL;
 }
@@ -143,6 +143,17 @@ int qlen(void)
     {
         ready++;
         curr_thread = curr_thread->sched_one;
+    }
+    return ready;
+}
+
+int waitingLen() {
+    int ready = 0;
+    thread curr_thread = waiting;
+    while (curr_thread != NULL)
+    {
+        ready++;
+        curr_thread = curr_thread->lib_one;
     }
     return ready;
 }
@@ -306,26 +317,24 @@ void lwp_yield(void)
     // print out the old thread
     //fprintf(stdout, "In yield, Old thread is %d\n", current_thread->tid);
     if (schedule->qlen() == 1) { // we never hit this block
-        fprintf(stdout, "Threads in schedule: %d\n", schedule->qlen());
+        print_list();
+        fprintf(stdout, "Head ID: %d\n", head->tid);
         lwp_exit(3);
-        
+    }
+    
+    next_thread = schedule->next();
+
+    // check if next thread is null meaning we have no scheduled threads
+    if(next_thread == NULL) {
+        lwp_exit(3);
     }
 
-    else {
-        next_thread = schedule->next();
+    current_running_thread_tid = next_thread->tid;
+    // print out the new thread
+    //fprintf(stdout, "In yield, New thread is %d\n", next_thread->tid);
 
-        // check if next thread is null meaning we have no scheduled threads
-        if(next_thread == NULL) {
-            lwp_exit(3);
-        }
-
-        current_running_thread_tid = next_thread->tid;
-        // print out the new thread
-        //fprintf(stdout, "In yield, New thread is %d\n", next_thread->tid);
-
-        // swap the context of the current thread with the next thread
-        swap_rfiles(&current_thread->state, &next_thread->state);
-    }
+    // swap the context of the current thread with the next thread
+    swap_rfiles(&current_thread->state, &next_thread->state);
 }
 
 
@@ -344,15 +353,17 @@ void lwp_exit(int status)
     thread removed_thread;
     removed_thread = tid2thread(lwp_gettid()); 
     // Set the status using the Macros QUESTION BELOW:
+    fprintf(stdout, "Thread ID: %d\n", removed_thread->tid);
     removed_thread->status = MKTERMSTAT(status, removed_thread->status); // is this the correct way?
     
-    fprintf(stdout, "Threads in schedule: %d\n", schedule->qlen());
+    // fprintf(stdout, "Threads in schedule: %d\n", schedule->qlen());
     schedule->remove(removed_thread);
-    fprintf(stdout, "Threads in schedule: %d\n", schedule->qlen());
+   
 
     // put this thread at the end of the terminated list (exited)  // need to address the waiting threads before putting calling thread on terminated
     if (terminated == NULL)
-    {
+    {   
+        fprintf(stdout, "Terminated thread ID: %d\n", removed_thread->tid);
         terminated = removed_thread;
     }
     else
@@ -415,13 +426,17 @@ tid_t lwp_wait(int *status) // removing too many times somewhere before exitting
         // Yield to the next process
         thread next_thread = schedule->next();
         current_running_thread_tid = next_thread->tid;
-        schedule->remove(calling_thread); // need to clean up the thread that terminated (exited) before we go to next
+
+        schedule->remove(calling_thread);
         swap_rfiles(&calling_thread->state, &next_thread->state);
+        // fprintf(stdout, "Continue while no terminated in wait\n");
+        // fprintf(stdout, "Terminated thread ID: %d\n", terminated->tid);
     }
 
     // if we get here, we have a terminated thread, so we can clean up the memory
     thread terminated_thread = terminated; // get the thread at the front of the list
     terminated = terminated->exited;       // remove the thread from the list
+    terminated_thread->exited = NULL;
     // free the memory for the stack
 
     munmap(terminated_thread->stack, terminated_thread->stacksize);
