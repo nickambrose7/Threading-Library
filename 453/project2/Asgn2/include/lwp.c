@@ -120,11 +120,14 @@ thread next(void)
     /* select a thread to schedule   */
     // put current thread at the end of the queue, should put NULL if no other processes in pool
     if (head != NULL) {
+        fprintf(stdout, "Head thread id is %d\n", head->tid);
         thread finished = head;
         sched_remove(finished);
         admit(finished); //looks like this is already done in yield
         // return the next thread
-        return head;
+        // print the thid of the head
+        
+        return finished;
     }
 
     return NULL;
@@ -387,9 +390,11 @@ tid_t lwp_wait(int *status)
             }
             // set next to new thread
             curr_thread->lib_one = calling_thread;
-            //sched_remove(calling_thread); // removed twice
-            lwp_yield(); // yield to next process, so that we wait for an exited thread
         }
+        // Yield to the next process
+        thread next_thread = schedule->next();
+        schedule->remove(calling_thread);
+        swap_rfiles(&calling_thread->state, &next_thread->state);
     }
 
     // if we get here, we have a terminated thread, so we can clean up the memory
@@ -437,8 +442,11 @@ void lwp_start(void)
     //  we will return to lwp_wrap. To do this switch I will get the next thread from the scheduler.
     //  Then I will use swap_rfiles to switch the stack to this thread. All the info about threads will
     //  be stored in the scheduler, allowing this process to work.
-    first_lwp = schedule->next(); // issue is in next
-    //fprintf(stdout, "We got here\n");
+    print_list();
+    first_lwp = schedule->next(); 
+    //print the first_lwp process id
+    fprintf(stdout, "First lwp process id is %d\n", first_lwp->tid);
+    
     swap_rfiles(&calling_thread->state, &first_lwp->state);
     // print that we got here
     //  FROM PIAZZA: Can also call swaprfiles with only an "old" parameter, to back up the current registers
