@@ -62,12 +62,12 @@ int main(int argc, char *argv[]){
   }
 
   lwp_start();
-
+  
   /* wait for the other LWPs */
   for(i=1;i<=5;i++) {
     int status,num;
     tid_t t;
-    t = lwp_wait(&status);
+    t = lwp_wait(&status); 
     num = LWPTERMSTAT(status);
     printf("Thread %ld exited with status %d\n",t,num);
   }

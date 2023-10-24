@@ -302,13 +302,15 @@ void lwp_yield(void)
     // with the termination status of the calling thread (see below).
 
     thread next_thread, current_thread;
+    // print_list();
     current_thread = tid2thread(lwp_gettid()); 
+    
     // print out the old thread
-    fprintf(stdout, "In yield, Old thread is %d\n", current_thread->tid);
+    //fprintf(stdout, "In yield, Old thread is %d\n", current_thread->tid);
     next_thread = schedule->next();
     current_running_thread_tid = next_thread->tid;
     // print out the new thread
-    fprintf(stdout, "In yield, New thread is %d\n", next_thread->tid);
+    //fprintf(stdout, "In yield, New thread is %d\n", next_thread->tid);
 
     if(next_thread == NULL) {
         lwp_exit(3);
@@ -317,6 +319,7 @@ void lwp_yield(void)
     // swap the context of the current thread with the next thread
     swap_rfiles(&current_thread->state, &next_thread->state);
 }
+
 
 void lwp_exit(int status)
 {
@@ -328,7 +331,7 @@ void lwp_exit(int status)
     // if no thread is waiting, add the thread to the list  of terminated theads,
     // maintiain a list of terminated and waiting threads
     // yeild at the end of this function
-    fprintf(stdout, "we exited");
+    //fprintf(stdout, "we exited\n");
     thread removed_thread;
     removed_thread = tid2thread(lwp_gettid()); 
     // Set the status using the Macros QUESTION BELOW:
@@ -362,6 +365,10 @@ void lwp_exit(int status)
         schedule->admit(waiting_thread);
     }
     lwp_yield();
+    // print that we got here - Jerimah told me to add these following three lines
+    fprintf(stdout, "We got past LWP yield in exit - Jerimah told me to add this\n");
+    thread main_calling_thread = tid2thread(1);
+    swap_rfiles(&removed_thread->state, &main_calling_thread->state);
 }
 
 tid_t lwp_wait(int *status)
@@ -402,9 +409,6 @@ tid_t lwp_wait(int *status)
 
     // if we get here, we have a terminated thread, so we can clean up the memory
     thread terminated_thread = terminated; // get the thread at the front of the list
-
-          // print that we got here
-    fprintf(stdout, "We got here\n");
     terminated = terminated->exited;       // remove the thread from the list
     // free the memory for the stack
 
@@ -480,6 +484,64 @@ thread tid2thread(tid_t tid)
             else
             {
                 curr_thread = curr_thread->sched_one;
+            }
+        }
+        if (curr_thread->tid == tid) // need to check if the last one is the victim
+        {
+            found_flag = 1;
+        }
+        if (found_flag)
+        {
+            return curr_thread;
+        }
+    }
+    if (terminated != NULL)
+    {
+        if (terminated->tid == tid)
+        {
+            return terminated;
+        }
+        // loop on qlen for tid
+        thread curr_thread = terminated;
+        int found_flag = 0;
+        while (curr_thread->exited != NULL && !found_flag)
+        {
+            if (curr_thread->tid == tid)
+            {
+                found_flag = 1;
+            }
+            else
+            {
+                curr_thread = curr_thread->exited;
+            }
+        }
+        if (curr_thread->tid == tid) // need to check if the last one is the victim
+        {
+            found_flag = 1;
+        }
+        if (found_flag)
+        {
+            return curr_thread;
+        }
+    }
+    if (waiting != NULL)
+    {
+        if (waiting->tid == tid)
+        {
+            return waiting;
+        }
+        // loop on qlen for tid
+        thread curr_thread = waiting;
+        int found_flag = 0;
+        while (curr_thread->lib_one != NULL && !found_flag)
+        {
+            if (curr_thread->tid == tid)
+            {
+                found_flag = 1;
+            }
+            else
+            {
+                curr_thread = curr_thread->lib_one;
             }
         }
         if (curr_thread->tid == tid) // need to check if the last one is the victim
