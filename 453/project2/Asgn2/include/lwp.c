@@ -57,8 +57,6 @@ void admit(thread new)
         while (curr_thread->sched_one != NULL)
         {
             curr_thread = curr_thread->sched_one;
-
-
         }
         // set next to new thread
         curr_thread->sched_one = new;
@@ -141,7 +139,7 @@ int qlen(void)
     /* number of ready threads       */
     int ready = 0;
     thread curr_thread = head;
-    while (curr_thread != NULL && curr_thread->status == LWP_LIVE)
+    while (curr_thread != NULL)
     {
         ready++;
         curr_thread = curr_thread->sched_one;
@@ -197,7 +195,7 @@ tid_t lwp_create(lwpfun function, void *argument)
         exit(EXIT_FAILURE);
     }
     c->tid = tid_counter++;
-    c->status = LWP_LIVE; // Since I add this thread to the scheduler, is it okay if I set it to live???
+    c->status = LWP_LIVE; // Since I add this thread to the scheduler, is it okay if I set it to live??? --> yes
     c->sched_one = NULL;
     c->sched_two = NULL;
     c->exited = NULL;
@@ -307,17 +305,27 @@ void lwp_yield(void)
     
     // print out the old thread
     //fprintf(stdout, "In yield, Old thread is %d\n", current_thread->tid);
-    next_thread = schedule->next();
-    current_running_thread_tid = next_thread->tid;
-    // print out the new thread
-    //fprintf(stdout, "In yield, New thread is %d\n", next_thread->tid);
-
-    if(next_thread == NULL) {
+    if (schedule->qlen() == 1) { // we never hit this block
+        fprintf(stdout, "Threads in schedule: %d\n", schedule->qlen());
         lwp_exit(3);
+        
     }
 
-    // swap the context of the current thread with the next thread
-    swap_rfiles(&current_thread->state, &next_thread->state);
+    else {
+        next_thread = schedule->next();
+
+        // check if next thread is null meaning we have no scheduled threads
+        if(next_thread == NULL) {
+            lwp_exit(3);
+        }
+
+        current_running_thread_tid = next_thread->tid;
+        // print out the new thread
+        //fprintf(stdout, "In yield, New thread is %d\n", next_thread->tid);
+
+        // swap the context of the current thread with the next thread
+        swap_rfiles(&current_thread->state, &next_thread->state);
+    }
 }
 
 
@@ -331,14 +339,18 @@ void lwp_exit(int status)
     // if no thread is waiting, add the thread to the list  of terminated theads,
     // maintiain a list of terminated and waiting threads
     // yeild at the end of this function
+
     //fprintf(stdout, "we exited\n");
     thread removed_thread;
     removed_thread = tid2thread(lwp_gettid()); 
     // Set the status using the Macros QUESTION BELOW:
     removed_thread->status = MKTERMSTAT(status, removed_thread->status); // is this the correct way?
+    
+    fprintf(stdout, "Threads in schedule: %d\n", schedule->qlen());
     schedule->remove(removed_thread);
+    fprintf(stdout, "Threads in schedule: %d\n", schedule->qlen());
 
-    // put this thread at the end of the terminated list (exited)
+    // put this thread at the end of the terminated list (exited)  // need to address the waiting threads before putting calling thread on terminated
     if (terminated == NULL)
     {
         terminated = removed_thread;
@@ -365,13 +377,13 @@ void lwp_exit(int status)
         schedule->admit(waiting_thread);
     }
     lwp_yield();
-    // print that we got here - Jerimah told me to add these following three lines
-    fprintf(stdout, "We got past LWP yield in exit - Jerimah told me to add this\n");
-    thread main_calling_thread = tid2thread(1);
-    swap_rfiles(&removed_thread->state, &main_calling_thread->state);
+    // print that we got here - Jerimah told me to add these following three line
+    // fprintf(stdout, "We got past LWP yield in exit - Jerimah told me to add this\n");
+    // thread main_calling_thread = tid2thread(1);
+    // swap_rfiles(&removed_thread->state, &main_calling_thread->state);
 }
 
-tid_t lwp_wait(int *status)
+tid_t lwp_wait(int *status) // removing too many times somewhere before exitting, 
 {
     /*Deallocates the resources of a terminated LWP. If no LWPs have terminated and there still exist
     runnable threads, blocks until one terminates. If status is non-NULL, *status is populated with its
@@ -403,7 +415,7 @@ tid_t lwp_wait(int *status)
         // Yield to the next process
         thread next_thread = schedule->next();
         current_running_thread_tid = next_thread->tid;
-        schedule->remove(calling_thread);
+        schedule->remove(calling_thread); // need to clean up the thread that terminated (exited) before we go to next
         swap_rfiles(&calling_thread->state, &next_thread->state);
     }
 
