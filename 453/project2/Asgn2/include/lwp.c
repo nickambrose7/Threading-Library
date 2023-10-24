@@ -302,7 +302,7 @@ void lwp_yield(void)
     current_thread = tid2thread(lwp_gettid());
     next_thread = schedule->next();
 
-    if(next_thread == NULL) {
+    if(next_thread == NULL || schedule->qlen) {
         lwp_exit(3);
     }
 
