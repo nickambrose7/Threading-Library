@@ -13,6 +13,7 @@ scheduler schedule = NULL;
 
 // global threadpool --> make thread pointer, maybe static
 thread head = NULL; // head of the thread pool, using the sched_one pointer
+// the thread we are currently executing should be at the back of the list
 
 thread terminated = NULL; // list of terminated threads, using the exited pointer
 
@@ -21,7 +22,10 @@ thread waiting = NULL; // list of waiting threads, using the lib_one pointer
 // Need to keep track of the return address that we replaced with the address of the function arg
 // need to keep track of the scheduler
 int tid_counter = 2;
-// scheduler sched;
+
+
+// Keep track of the TID of the currently executing thread
+tid_t current_running_thread_tid = 1;
 
 // SCHEDULER STUFF BELOW:
 
@@ -39,7 +43,7 @@ int tid_counter = 2;
 
 void admit(thread new)
 {
-    /* add a thread to the pool      */
+    /* add a thread to the pool at the tail of the linked list */
 
     // check if we have empty thread pool
     if (head == NULL)
@@ -62,7 +66,8 @@ void admit(thread new)
 }
 void sched_remove(thread victim)
 {
-    /* remove a thread from the pool */
+    /* remove a thread from the pool, should delete all references to this 
+    thread unless we saved one before the call to this function */
 
     // check if we have empty thread pool
     if (head != NULL)
@@ -92,7 +97,10 @@ void sched_remove(thread victim)
                     found_flag = 1;
                 }
             }
-
+            if (curr_thread->tid == victim->tid) // need to check if the last one is the victim
+            {
+                found_flag = 1;
+            }
             if (found_flag)
             {
                 // get the next thread to link prev to next, either sets to the next thread or NULL
@@ -104,14 +112,14 @@ void sched_remove(thread victim)
             else
             {
                 perror("Error finding thread to remove");
-                //exit(EXIT_FAILURE);
+                exit(EXIT_FAILURE);
             }
         }
     }
     else
     {
         perror("Empty queue, nothing to remove");
-        //exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -120,18 +128,12 @@ thread next(void)
     /* select a thread to schedule   */
     // put current thread at the end of the queue, should put NULL if no other processes in pool
     if (head != NULL) {
-        fprintf(stdout, "Head thread id is %d\n", head->tid);
-        thread finished = head;
-        sched_remove(finished);
-        admit(finished); //looks like this is already done in yield
-        // return the next thread
-        // print the thid of the head
-        
-        return finished;
+        thread next = head;
+        sched_remove(next);
+        admit(next); // put the thread at the end of the queue   
+        return next;
     }
-
     return NULL;
-
 }
 
 int qlen(void)
@@ -299,18 +301,18 @@ void lwp_yield(void)
     //     Yields control to the next thread as indicated by the scheduler. If there is no next thread, calls exit(3)
     // with the termination status of the calling thread (see below).
 
-    // TODO: get the next thread from the scheduler
-    print_list();
     thread next_thread, current_thread;
-    current_thread = tid2thread(lwp_gettid());
+    current_thread = tid2thread(lwp_gettid()); 
+    // print out the old thread
+    fprintf(stdout, "In yield, Old thread is %d\n", current_thread->tid);
     next_thread = schedule->next();
+    current_running_thread_tid = next_thread->tid;
+    // print out the new thread
+    fprintf(stdout, "In yield, New thread is %d\n", next_thread->tid);
 
-    if(next_thread == NULL || schedule->qlen) {
+    if(next_thread == NULL) {
         lwp_exit(3);
     }
-
-    // // admit the old thread to the scheduler
-    // schedule->admit(current_thread);
 
     // swap the context of the current thread with the next thread
     swap_rfiles(&current_thread->state, &next_thread->state);
@@ -328,7 +330,7 @@ void lwp_exit(int status)
     // yeild at the end of this function
     fprintf(stdout, "we exited");
     thread removed_thread;
-    removed_thread = tid2thread(lwp_gettid());
+    removed_thread = tid2thread(lwp_gettid()); 
     // Set the status using the Macros QUESTION BELOW:
     removed_thread->status = MKTERMSTAT(status, removed_thread->status); // is this the correct way?
     schedule->remove(removed_thread);
@@ -368,7 +370,7 @@ tid_t lwp_wait(int *status)
     runnable threads, blocks until one terminates. If status is non-NULL, *status is populated with its
     termination status. Returns the tid of the terminated thread or NO_THREAD if it would block forever
     because there are no more runnable threads that could terminate.*/
-    thread calling_thread = tid2thread(lwp_gettid());
+    thread calling_thread = tid2thread(lwp_gettid()); // USE GLOBAL NOW
     if (terminated == NULL) // no terminated threads, so we have to block
     {
         //schedule->remove(calling_thread); // deschedule the current thread, to block <-- you remove this here but when you yield you call next which will remove the queued thread not good
@@ -393,6 +395,7 @@ tid_t lwp_wait(int *status)
         }
         // Yield to the next process
         thread next_thread = schedule->next();
+        current_running_thread_tid = next_thread->tid;
         schedule->remove(calling_thread);
         swap_rfiles(&calling_thread->state, &next_thread->state);
     }
@@ -413,7 +416,13 @@ tid_t lwp_wait(int *status)
 tid_t lwp_gettid(void)
 {
     // check if we have empty thread pool
-    return head->tid;
+    if (qlen() == 0)
+    {
+        perror("No running threads, can't get tid of current thread");
+        return NO_THREAD;
+
+    }
+    return current_running_thread_tid;
 }
 
 void lwp_start(void)
@@ -437,21 +446,18 @@ void lwp_start(void)
     // admit the context to the scheduler
     schedule->admit(calling_thread);
 
-
     // TODO: VERY LAST THING we do in this function is switch the stack to the first lwp, then when we return
     //  we will return to lwp_wrap. To do this switch I will get the next thread from the scheduler.
     //  Then I will use swap_rfiles to switch the stack to this thread. All the info about threads will
     //  be stored in the scheduler, allowing this process to work.
-    print_list();
     first_lwp = schedule->next(); 
-    //print the first_lwp process id
-    fprintf(stdout, "First lwp process id is %d\n", first_lwp->tid);
-    
+    current_running_thread_tid = first_lwp->tid; 
     swap_rfiles(&calling_thread->state, &first_lwp->state);
     // print that we got here
     //  FROM PIAZZA: Can also call swaprfiles with only an "old" parameter, to back up the current registers
     //  into a rfile, then admit the new thread and call yeild(). Q 129 in piazza
 }
+
 
 thread tid2thread(tid_t tid)
 { // MAY HAVE TO CHECK TERMINATED THREAD LIST AS WELL, NOT SURE
@@ -476,7 +482,10 @@ thread tid2thread(tid_t tid)
                 curr_thread = curr_thread->sched_one;
             }
         }
-
+        if (curr_thread->tid == tid) // need to check if the last one is the victim
+        {
+            found_flag = 1;
+        }
         if (found_flag)
         {
             return curr_thread;
