@@ -9,7 +9,8 @@
 // define global variables
 
 // global scheduler
-scheduler schedule;
+scheduler schedule = NULL;
+
 // global threadpool --> make thread pointer, maybe static
 thread head = NULL; // head of the thread pool, using the sched_one pointer
 
@@ -26,7 +27,6 @@ int tid_counter = 2;
 
 // making round robin scheduler
 // do not need init and shutdown because our structure is just a thread struct
-
 
 // void init(void) {
 //     /* initialize any structures     */
@@ -65,33 +65,41 @@ void sched_remove(thread victim)
     // check if we have empty thread pool
     if (head != NULL)
     {
-        // loop on qlen for tid
-        thread prev_thread = NULL;
-        thread curr_thread = head;
-        int found_flag = 0;
-        while (curr_thread->sched_one != NULL && !found_flag)
+        // first check if the head is what we want to remove so that we don't seg fault
+        if (head->tid == victim->tid)
         {
-            if (curr_thread->tid != victim->tid)
-            {
-                prev_thread = curr_thread;
-                curr_thread = curr_thread->sched_one;
-            }
-            else
-            {
-                found_flag = 1;
-            }
-        }
-
-        if (found_flag)
-        {
-            // get the next thread to link prev to next, either sets to the next thread or NULL
-            thread next_thread = curr_thread->sched_one;
-            prev_thread->sched_one = next_thread;
+            head = head->sched_one;
         }
         else
         {
-            perror("Error finding thread to remove");
-            exit(EXIT_FAILURE);
+            // loop on qlen for tid
+            thread prev_thread = NULL;
+            thread curr_thread = head;
+            int found_flag = 0;
+            while (curr_thread->sched_one != NULL && !found_flag)
+            {
+                if (curr_thread->tid != victim->tid)
+                {
+                    prev_thread = curr_thread;
+                    curr_thread = curr_thread->sched_one;
+                }
+                else
+                {
+                    found_flag = 1;
+                }
+            }
+
+            if (found_flag)
+            {
+                // get the next thread to link prev to next, either sets to the next thread or NULL
+                thread next_thread = curr_thread->sched_one;
+                prev_thread->sched_one = next_thread;
+            }
+            else
+            {
+                perror("Error finding thread to remove");
+                exit(EXIT_FAILURE);
+            }
         }
     }
     else
@@ -106,7 +114,7 @@ thread next(void)
     /* select a thread to schedule   */
     // put current thread at the end of the queue, should put NULL if no other processes in pool
     thread finished = head;
-    head = head->sched_one;
+    // head = head->sched_one;
     sched_remove(finished);
     // RoundRobin->admit(finished); looks like this is already done in yield
     // return the next thread
@@ -125,6 +133,7 @@ int qlen(void)
     }
     return ready;
 }
+
 struct scheduler rr_publish = {NULL, NULL, admit, sched_remove, next, qlen};
 scheduler RoundRobin = &rr_publish;
 
@@ -190,6 +199,8 @@ tid_t lwp_create(lwpfun function, void *argument)
             resource_limit = resource_limit + (page_size - (resource_limit % page_size));
         }
     }
+    // // print our resource limit, make sure it is a multiple of 16 GOOD
+    // fprintf(stdout, "Resource limit is %lu\n", resource_limit);
 
     // Allocate a stack the size of our resource limit, MAP_STACK ensures stack is on 16-byte boundary
     // stack pointer will be at a low memory address
@@ -207,7 +218,7 @@ tid_t lwp_create(lwpfun function, void *argument)
     c->stack = stack_pointer; // Set base of the stack, need so that we can unmap later
 
     // now our stack pointer is at high memory address, divide by size of unsigned long
-    stack_pointer = stack_pointer + ((unsigned long) resource_limit);
+    stack_pointer = stack_pointer + (resource_limit / sizeof(unsigned long));
 
     // check that stack pointer is divisble by 16, move to lower addresses.
     if ((uintptr_t)stack_pointer % 16 != 0)
@@ -216,38 +227,47 @@ tid_t lwp_create(lwpfun function, void *argument)
         exit(EXIT_FAILURE);
     }
 
-    printf("Stack size is %p\n", resource_limit);
-    
+    // printf("Stack size is %p\n", resource_limit);
+
     // // possible off by one fix:
     // if (resource_limit % page_size != 0) {
     //     resource_limit = ((resource_limit / page_size) + 1) * page_size;
     // }
     c->stacksize = resource_limit; // keep track of stack size in bytes
     // print that we are at line 227 using fprintf
-    //fprintf(stdout, "Line 227\n"); // TODO: remove this line, only for testing of
+    // fprintf(stdout, "Line 227\n"); // TODO: remove this line, only for testing of
 
-    // need to push the address of the function wrapper onto the stack
-    
-    // print out stack pointer
-    fprintf(stdout, "Stack pointer is %p\n", stack_pointer);
-    *stack_pointer = (unsigned long) 0;
-    fprintf(stdout, "Where is the error\n");
-    stack_pointer--;           // this will subtract the size of an unsiged long from the stack pointer
-    *stack_pointer = (unsigned long) lwp_wrap; // this will push the address of the function wrapper onto the stack
-    stack_pointer--;           // this will subtract the size of an unsiged long from the stack pointer
+    // // need to push the address of the function wrapper onto the stack
+    // unsigned long* temp = stack_pointer;
+    // // print the size of the temp variable in bytes
+    // fprintf(stdout, "Size of temp is %lu\n", sizeof(temp));
+    // fprintf(stdout, "Stack pointer is %p\n", stack_pointer);
+    // stack_pointer--;           // this will subtract the size of an unsiged long from the stack pointer
+    // fprintf(stdout, "Stack pointer is %p\n", sizeof(temp - stack_pointer));
+
+    // WE HAD TO DECREMENT LIKE THIS BECAUSE WE WERE GETTING A SEG FAULT
+    stack_pointer--;
+    *stack_pointer = (unsigned long)0;
+    stack_pointer--;                          // this will subtract the size of an unsiged long from the stack pointer
+    *stack_pointer = (unsigned long)lwp_wrap; // this will push the address of the function wrapper onto the stack
+
     // need to move the address two times so that we say alligned on 16 byte boundary
-    
 
     // need to set all the registers for the new lwp using the function arguments from above
-    c->state.rdi = (unsigned long) function;
-    c->state.rsi = (unsigned long) argument;
-    c->state.rbp = (unsigned long) stack_pointer; // should this go before we add the addres to the stack?
-    c->state.rsp = (unsigned long) stack_pointer;
+    c->state.rdi = (unsigned long)function;
+    c->state.rsi = (unsigned long)argument;
+    c->state.rbp = (unsigned long)stack_pointer; // should this go before we add the addres to the stack?
+    c->state.rsp = (unsigned long)stack_pointer;
     c->state.fxsave = FPU_INIT;
 
     // admit the context to the scheduler
-    schedule->admit(c);
 
+    // fprintf(stdout, "The error is right below this:\n");
+    if (schedule == NULL)
+    {
+        schedule = RoundRobin;
+    }
+    schedule->admit(c);
     return c->tid;
 }
 
@@ -345,11 +365,11 @@ tid_t lwp_wait(int *status)
         }
     }
     // if we get here, we have a terminated thread, so we can clean up the memory
-    thread terminated_thread = terminated;     // get the thread at the front of the list
-    terminated = terminated->exited;     // remove the thread from the list
+    thread terminated_thread = terminated; // get the thread at the front of the list
+    terminated = terminated->exited;       // remove the thread from the list
     // free the memory for the stack
     munmap(terminated_thread->stack, terminated_thread->stacksize);
-    free(terminated_thread);     // free the memory for the context
+    free(terminated_thread); // free the memory for the context
     return terminated_thread->tid;
 }
 
@@ -379,35 +399,26 @@ void lwp_start(void)
 
     // admit the context to the scheduler
     schedule->admit(calling_thread);
+    // print_admitted_list
+    fprintf(stdout, "The admitted list is: ");
+    thread curr_thread = head;
+    while (curr_thread != NULL)
+    {
+        fprintf(stdout, "%d ", curr_thread->tid);
+        curr_thread = curr_thread->sched_one;
+    }
+    fprintf(stdout, "\n");
 
     // TODO: VERY LAST THING we do in this function is switch the stack to the first lwp, then when we return
     //  we will return to lwp_wrap. To do this switch I will get the next thread from the scheduler.
     //  Then I will use swap_rfiles to switch the stack to this thread. All the info about threads will
     //  be stored in the scheduler, allowing this process to work.
-    first_lwp = schedule->next();
+    first_lwp = schedule->next(); // issue is in next
+    fprintf(stdout, "We got here\n");
     swap_rfiles(&calling_thread->state, &first_lwp->state);
-
-    // FROM PIAZZA: Can also call swaprfiles with only an "old" parameter, to back up the current registers
-    // into a rfile, then admit the new thread and call yeild(). Q 129 in piazza
-}
-
-void lwp_set_scheduler(scheduler fun)
-{
-    // if fun is null initialize round robin
-    if (fun != NULL)
-    {
-        schedule = fun;
-        fun->init();
-    }
-    else
-    {
-        schedule = RoundRobin;
-    }
-}
-
-scheduler lwp_get_scheduler(void)
-{
-    return schedule;
+    // print that we got here
+    //  FROM PIAZZA: Can also call swaprfiles with only an "old" parameter, to back up the current registers
+    //  into a rfile, then admit the new thread and call yeild(). Q 129 in piazza
 }
 
 thread tid2thread(tid_t tid)
@@ -438,3 +449,21 @@ thread tid2thread(tid_t tid)
     return NULL;
 }
 
+void lwp_set_scheduler(scheduler fun)
+{
+    // if fun is null initialize round robin
+    if (fun != NULL)
+    {
+        schedule = fun;
+        fun->init();
+    }
+    else
+    {
+        schedule = RoundRobin;
+    }
+}
+
+scheduler lwp_get_scheduler(void)
+{
+    return schedule;
+}
