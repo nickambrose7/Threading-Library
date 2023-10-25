@@ -108,7 +108,8 @@ void sched_remove(thread victim)
                 curr_thread->sched_one = NULL;
             }
             else
-            {
+            {   
+                fprintf(stdout, "Victim: %d\n", victim->tid);
                 perror("Error finding thread to remove");
                 exit(EXIT_FAILURE);
             }
@@ -150,6 +151,16 @@ int qlen(void)
 int waitingLen() {
     int ready = 0;
     thread curr_thread = waiting;
+    while (curr_thread != NULL)
+    {
+        ready++;
+        curr_thread = curr_thread->lib_one;
+    }
+    return ready;
+}
+int termLen() {
+    int ready = 0;
+    thread curr_thread = terminated;
     while (curr_thread != NULL)
     {
         ready++;
@@ -316,12 +327,7 @@ void lwp_yield(void)
     
     // print out the old thread
     //fprintf(stdout, "In yield, Old thread is %d\n", current_thread->tid);
-    if (schedule->qlen() == 1) { // we never hit this block
-        print_list();
-        fprintf(stdout, "Head ID: %d\n", head->tid);
-        lwp_exit(3);
-    }
-    
+
     next_thread = schedule->next();
 
     // check if next thread is null meaning we have no scheduled threads
@@ -335,6 +341,7 @@ void lwp_yield(void)
 
     // swap the context of the current thread with the next thread
     swap_rfiles(&current_thread->state, &next_thread->state);
+    
 }
 
 
@@ -353,17 +360,17 @@ void lwp_exit(int status)
     thread removed_thread;
     removed_thread = tid2thread(lwp_gettid()); 
     // Set the status using the Macros QUESTION BELOW:
-    fprintf(stdout, "Thread ID: %d\n", removed_thread->tid);
+    //fprintf(stdout, "Thread ID: %d\n", removed_thread->tid);
     removed_thread->status = MKTERMSTAT(status, removed_thread->status); // is this the correct way?
     
     // fprintf(stdout, "Threads in schedule: %d\n", schedule->qlen());
-    schedule->remove(removed_thread);
+    //schedule->remove(removed_thread);
    
 
     // put this thread at the end of the terminated list (exited)  // need to address the waiting threads before putting calling thread on terminated
     if (terminated == NULL)
     {   
-        fprintf(stdout, "Terminated thread ID: %d\n", removed_thread->tid);
+        //fprintf(stdout, "Terminated thread ID: %d\n", removed_thread->tid);
         terminated = removed_thread;
     }
     else
@@ -389,9 +396,9 @@ void lwp_exit(int status)
     }
     lwp_yield();
     // print that we got here - Jerimah told me to add these following three line
-    // fprintf(stdout, "We got past LWP yield in exit - Jerimah told me to add this\n");
-    // thread main_calling_thread = tid2thread(1);
-    // swap_rfiles(&removed_thread->state, &main_calling_thread->state);
+    fprintf(stdout, "We got past LWP yield in exit - Jerimah told me to add this\n");
+    thread main_calling_thread = tid2thread(1);
+    swap_rfiles(&removed_thread->state, &main_calling_thread->state);
 }
 
 tid_t lwp_wait(int *status) // removing too many times somewhere before exitting, 
@@ -444,10 +451,10 @@ tid_t lwp_wait(int *status) // removing too many times somewhere before exitting
     return terminated_thread->tid;
 }
 
-tid_t lwp_gettid(void)
+tid_t lwp_gettid(void) // problem could be here
 {
     // check if we have empty thread pool
-    if (qlen() == 0)
+    if (schedule->qlen() == 0)
     {
         perror("No running threads, can't get tid of current thread");
         return NO_THREAD;
