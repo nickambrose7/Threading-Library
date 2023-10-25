@@ -464,9 +464,7 @@ void lwp_start(void)
     first_lwp = schedule->next(); 
     current_running_thread_tid = first_lwp->tid; 
     swap_rfiles(&calling_thread->state, &first_lwp->state);
-    // print that we got here
-    //  FROM PIAZZA: Can also call swaprfiles with only an "old" parameter, to back up the current registers
-    //  into a rfile, then admit the new thread and call yeild(). Q 129 in piazza
+   
 }
 
 
