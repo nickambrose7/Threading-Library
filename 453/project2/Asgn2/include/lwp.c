@@ -6,6 +6,9 @@
 #define _GNU_SOURCE
 #include <sys/mman.h>
 
+// alternate scheduler
+#include "thread_list.h"
+
 // define global variables
 
 // global scheduler
@@ -101,7 +104,6 @@ void sched_remove(thread victim)
             }
             else
             {   
-                fprintf(stdout, "Victim: %d\n", victim->tid);
                 perror("Error finding thread to remove");
                 exit(EXIT_FAILURE);
             }
@@ -265,18 +267,16 @@ void lwp_yield(void)
     // with the termination status of the calling thread (see below).
 
     thread next_thread, current_thread;
-
+    
     
     current_thread = tid2thread(lwp_gettid()); 
     next_thread = schedule->next();
-
     // check if next thread is null meaning we have no scheduled threads
     if(next_thread == NULL) {
         lwp_exit(3);
     }
 
     current_running_thread_tid = next_thread->tid;
-
     // swap the context of the current thread with the next thread
     swap_rfiles(&current_thread->state, &next_thread->state);
     
@@ -295,7 +295,7 @@ void lwp_exit(int status)
     // yeild at the end of this function
 
     thread removed_thread;
-    removed_thread = tid2thread(lwp_gettid()); 
+    removed_thread = tid2thread(lwp_gettid());
     // Set the status using the Macros QUESTION BELOW:
     //removed_thread->status = MKTERMSTAT(status, removed_thread->status); // is this the correct way?
     removed_thread->status = status;
@@ -431,6 +431,7 @@ void lwp_start(void)
 
 thread tid2thread(tid_t tid)
 {
+
     // check if we have empty thread pool
     if (head != NULL)
     {

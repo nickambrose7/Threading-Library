@@ -1,5 +1,7 @@
 #include "thread_list.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <sys/mman.h>
 
 
@@ -60,6 +62,7 @@ thread shift_thread_list(thread_list *list) {
 
 thread remove_from_thread_list_by_tid(thread_list *list, tid_t tid) {
     if (!list) {
+        //fprintf(stdout, "Seg fault!\n");
         return NULL;
     }
 

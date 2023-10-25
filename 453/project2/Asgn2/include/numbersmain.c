@@ -44,8 +44,8 @@
 #include <unistd.h>
 #include "lwp.h"
 #include "schedulers.h"
-// #include "fcfs.h"
-// #include "thread_list.h"
+#include "fcfs.h"
+#include "thread_list.h"
 
 #define MAXSNAKES  100
 
@@ -54,6 +54,7 @@ static void indentnum(void *num);
 int main(int argc, char *argv[]){
   long i;
   printf("Launching LWPS\n");
+  lwp_set_scheduler(FirstComeFirstServe);
 
   /* spawn a number of individual LWPs */
   for(i=1;i<=5;i++) {
