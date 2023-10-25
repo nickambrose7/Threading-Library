@@ -336,7 +336,8 @@ void lwp_exit(int status)
     thread removed_thread;
     removed_thread = tid2thread(lwp_gettid()); 
     // Set the status using the Macros QUESTION BELOW:
-    removed_thread->status = MKTERMSTAT(status, removed_thread->status); // is this the correct way?
+    //removed_thread->status = MKTERMSTAT(status, removed_thread->status); // is this the correct way?
+    removed_thread->status = status;
     schedule->remove(removed_thread);
 
     // put this thread at the end of the terminated list (exited)
@@ -413,7 +414,9 @@ tid_t lwp_wait(int *status)
 
     // if we get here, we have a terminated thread, so we can clean up the memory
     thread terminated_thread = terminated; // get the thread at the front of the list
-    terminated = terminated->exited;       // remove the thread from the list
+    // set the status of the thread
+    *status = MKTERMSTAT(LWP_TERM, terminated_thread->status);
+    terminated = terminated->exited;  // remove the thread from the list
     // free the memory for the stack
 
     munmap(terminated_thread->stack, terminated_thread->stacksize);
