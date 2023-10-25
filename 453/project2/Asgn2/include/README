@@ -8,4 +8,6 @@ INSTRUCTIONS:
     c. ./snakes
 3. can include our library in any program with the statement #include "lwp.h"
 
-All provided programs are working properly with the library
+All provided programs are working properly with the library, was not able to get FCFS 
+alternative scheduler to work properly. Attempted to get numbersmain to work but segfaulted
+on first creation. Seg fault stemming from tid2thread.

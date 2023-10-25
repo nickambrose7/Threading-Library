@@ -7,7 +7,7 @@
 #include "thread_list.h"
 
 
-scheduler FirstComeFirstServe = &(struct scheduler){ fcfs_init, fcfs_shutdown, fcfs_admit, fcfs_remove, fcfs_next, fcfs_qlen };
+scheduler FirstComeFirstServe = &(struct scheduler_){ fcfs_init, fcfs_shutdown, fcfs_admit, fcfs_remove, fcfs_next, fcfs_qlen };
 
 static thread_list *container = NULL;
 
