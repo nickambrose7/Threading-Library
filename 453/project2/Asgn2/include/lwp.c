@@ -302,11 +302,12 @@ void lwp_yield(void)
     // with the termination status of the calling thread (see below).
 
     thread next_thread, current_thread;
-    // print_list();
-    current_thread = tid2thread(lwp_gettid()); 
+
     
-    // print out the old thread
-    //fprintf(stdout, "In yield, Old thread is %d\n", current_thread->tid);
+    current_thread = tid2thread(lwp_gettid()); 
+    //print_list();
+    // print out the current running thread
+    //fprintf(stdout, "In yield, Current thread is %d\n", current_thread->tid);
     next_thread = schedule->next();
     current_running_thread_tid = next_thread->tid;
     // print out the new thread
@@ -364,9 +365,12 @@ void lwp_exit(int status)
         // admit the thread back into the scheduler
         schedule->admit(waiting_thread);
     }
-    lwp_yield();
+    if (qlen() > 0)
+    {
+            lwp_yield();
+    }
     // print that we got here - Jerimah told me to add these following three lines
-    fprintf(stdout, "We got past LWP yield in exit - Jerimah told me to add this\n");
+    //fprintf(stdout, "We got past LWP yield in exit - Jerimah told me to add this\n");
     thread main_calling_thread = tid2thread(1);
     swap_rfiles(&removed_thread->state, &main_calling_thread->state);
 }

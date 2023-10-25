@@ -72,7 +72,7 @@ int main(int argc, char *argv[]){
     printf("Thread %ld exited with status %d\n",t,num);
   }
 
-  printf("Back from LWPS.\n");
+  printf("Back from LWPS.\n"); // add breakpoint here
   lwp_exit(0);
   return 0;
 }
