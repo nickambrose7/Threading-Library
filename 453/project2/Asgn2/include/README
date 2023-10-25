@@ -1,0 +1,11 @@
+NAMES: Ethan Wagner, Nick Ambrose
+
+INSTRUCTIONS:
+1. make all
+2. call any of the available program that use oru library libLWP.a
+    a. ./nums
+    b. ./hungry
+    c. ./snakes
+3. can include our library in any program with the statement #include "lwp.h"
+
+All provided programs are working properly with the library

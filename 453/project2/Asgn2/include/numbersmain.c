@@ -53,7 +53,6 @@ static void indentnum(void *num);
 
 int main(int argc, char *argv[]){
   long i;
-  //lwp_set_scheduler(FirstComeFirstServe);
   printf("Launching LWPS\n");
 
   /* spawn a number of individual LWPs */
@@ -72,7 +71,7 @@ int main(int argc, char *argv[]){
     printf("Thread %ld exited with status %d\n",t,num);
   }
 
-  printf("Back from LWPS.\n");
+  printf("Back from LWPS.\n"); // add breakpoint here
   lwp_exit(0);
   return 0;
 }
