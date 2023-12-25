@@ -19,19 +19,14 @@ thread terminated = NULL; // list of terminated threads, using the exited pointe
 
 thread waiting = NULL; // list of waiting threads, using the lib_one pointer
 
-// Need to keep track of the return address that we replaced with the address of the function arg
-// need to keep track of the scheduler
+// global thread id counter
 int tid_counter = 2;
 
 
 // Keep track of the TID of the currently executing thread
 tid_t current_running_thread_tid = 1;
 
-// SCHEDULER STUFF BELOW:
-
-// making round robin scheduler
-// do not need init and shutdown because our structure is just a thread struct
-
+// RR SCHEDULER STUFF BELOW:
 
 void admit(thread new)
 {
@@ -144,8 +139,8 @@ int qlen(void)
 struct scheduler rr_publish = {NULL, NULL, admit, sched_remove, next, qlen};
 scheduler RoundRobin = &rr_publish;
 
-// END SCHEDULER STUFF
-// START LWP STUFF
+// END SCHEDULER FUNCTIONS
+// START LWP FUNCTIONS
 
 static void lwp_wrap(lwpfun fun, void *arg)
 {
