@@ -140,6 +140,7 @@ struct scheduler rr_publish = {NULL, NULL, admit, sched_remove, next, qlen};
 scheduler RoundRobin = &rr_publish;
 
 // END SCHEDULER FUNCTIONS
+
 // START LWP FUNCTIONS
 
 static void lwp_wrap(lwpfun fun, void *arg)
@@ -291,8 +292,6 @@ void lwp_exit(int status)
 
     thread removed_thread;
     removed_thread = tid2thread(lwp_gettid()); 
-    // Set the status using the Macros QUESTION BELOW:
-    //removed_thread->status = MKTERMSTAT(status, removed_thread->status); // is this the correct way?
     removed_thread->status = status;
     schedule->remove(removed_thread);
 
@@ -413,8 +412,8 @@ void lwp_start(void)
     // admit the context to the scheduler
     schedule->admit(calling_thread);
 
-    //  VERY LAST THING we do in this function is switch the stack to the first lwp, then when we return
-    //  we will return to lwp_wrap. To do this switch I will get the next thread from the scheduler.
+    //  VERY LAST THING we do in this function is switch the stack to the first lwp, then when we return.
+    //  We will return to lwp_wrap. To do this switch I will get the next thread from the scheduler.
     //  Then I will use swap_rfiles to switch the stack to this thread. All the info about threads will
     //  be stored in the scheduler, allowing this process to work.
     first_lwp = schedule->next(); 
